@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Heart Letter Animation</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: #333;
+            padding: 1rem;
+            touch-action: manipulation;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 1000px;
+            padding: 1.5rem;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+                margin: 0.5rem;
+                border-radius: 10px;
+            }
+        }
+        h1 {
+            color: #ff6b6b;
+            margin-bottom: 2rem;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        @media (min-width: 480px) {
+            .input-group {
+                flex-direction: row;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+        input[type="text"] {
+            padding: 0.8rem 1rem;
+            font-size: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            outline: none;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            font-size: clamp(0.9rem, 4vw, 1rem);
+        }
+        
+        @media (min-width: 480px) {
+            input[type="text"] {
+                width: 70%;
+                margin: 0 10px 0 0;
+            }
+        }
+        input[type="text"]:focus {
+            border-color: #ff6b6b;
+        }
+        button {
+            padding: 0.8rem 1.5rem;
+            font-size: clamp(0.9rem, 4vw, 1rem);
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+            touch-action: manipulation;
+        }
+        
+        @media (min-width: 480px) {
+            button {
+                padding: 0.8rem 2rem;
+            }
+        }
+        button:hover {
+            background-color: #ff5252;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        #canvasContainer {
+            margin: 1rem 0;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+        #textCanvas {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        #heartCanvas {
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            height: auto;
+            max-height: 60vh;
+            touch-action: none;
+        }
+        .heart {
+            position: absolute;
+            font-size: 20px;
+            pointer-events: none;
+            user-select: none;
+            animation: pulse 1s infinite alternate;
+        }
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Heart Letter Animation</h1>
+        <div class="input-group">
+            <input type="text" id="textInput" placeholder="Type your message..." value="HEART" autofocus>
+            <button onclick="startAnimation()">Animate! ❤️</button>
+        </div>
+        <div id="canvasContainer">
+            <canvas id="textCanvas"></canvas>
+            <canvas id="heartCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let textCanvas, heartCanvas, textCtx, heartCtx;
+        let animationId;
+        let points = [];
+        let hearts = [];
+        let startBlinking; // Will be set when typing animation is complete
+        
+        window.onload = function() {
+            textCanvas = document.getElementById('textCanvas');
+            heartCanvas = document.getElementById('heartCanvas');
+            textCtx = textCanvas.getContext('2d');
+            heartCtx = heartCanvas.getContext('2d');
+            
+            // Set canvas size
+            updateCanvasSize();
+            window.addEventListener('resize', updateCanvasSize);
+            
+            // Initial render
+            renderText('HEART');
+        };
+        
+        function updateCanvasSize() {
+            const container = document.getElementById('canvasContainer');
+            const maxWidth = Math.min(800, window.innerWidth - 40);
+            const width = Math.min(maxWidth, window.innerWidth - 32); // 16px padding on each side
+            const height = Math.min(300, Math.max(200, window.innerHeight * 0.4)); // Responsive height
+            
+            [textCanvas, heartCanvas].forEach(canvas => {
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+                canvas.width = width;
+                canvas.height = height;
+            });
+            
+            // Redraw if we have text
+            const currentText = document.getElementById('textInput').value.trim().toUpperCase();
+            if (currentText) {
+                renderText(currentText);
+            }
+        }
+        
+        // Handle window resize with debounce
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(updateCanvasSize, 100);
+        });
+        
+        // Handle orientation changes
+        window.addEventListener('orientationchange', updateCanvasSize);
+        
+        // Prevent zoom on double-tap (mobile)
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        function renderText(text) {
+            if (!text) return;
+            
+            // Clear previous animation
+            cancelAnimationFrame(animationId);
+            hearts = [];
+            
+            // Clear canvases
+            textCtx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+            heartCtx.clearRect(0, 0, heartCanvas.width, heartCanvas.height);
+            
+            // Set up text
+            const fontSize = Math.min(150, Math.floor(heartCanvas.width / (text.length * 0.8)));
+            textCtx.font = `bold ${fontSize}px Arial`;
+            textCtx.textAlign = 'center';
+            textCtx.textBaseline = 'middle';
+            textCtx.fillStyle = 'black';
+            
+            // Draw text to get pixel data
+            textCtx.fillText(text, heartCanvas.width / 2, heartCanvas.height / 2);
+            
+            // Get pixel data
+            const imageData = textCtx.getImageData(0, 0, textCanvas.width, textCanvas.height);
+            const data = imageData.data;
+            
+            // Clear text canvas after getting pixel data
+            textCtx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+            
+            // Find all non-transparent pixels
+            points = [];
+            for (let y = 0; y < textCanvas.height; y += 4) {
+                for (let x = 0; x < textCanvas.width; x += 4) {
+                    const index = (y * textCanvas.width + x) * 4;
+                    if (data[index + 3] > 128) { // If pixel is not transparent
+                        points.push({x, y});
+                    }
+                }
+            }
+            
+            // Create hearts at random points
+            const heartCount = Math.min(1000, points.length);
+            for (let i = 0; i < heartCount; i++) {
+                if (points.length === 0) break;
+                const pointIndex = Math.floor(Math.random() * points.length);
+                const point = points.splice(pointIndex, 1)[0];
+                
+                hearts.push({
+                    x: point.x,
+                    y: point.y,
+                    targetX: point.x,
+                    targetY: point.y,
+                    vx: 0,
+                    vy: 0,
+                    color: getRandomColor(),
+                    visible: false,
+                    delay: Math.random() * 2 // Random delay for each heart
+                });
+            }
+            
+            // Sort hearts by x-position to create typing effect from left to right
+            hearts.sort((a, b) => a.targetX - b.targetX);
+            
+            // Start the typing animation
+            showHeartsTypingEffect();
+        }
+        
+        function showHeartsTypingEffect() {
+            let visibleCount = 0;
+            const totalHearts = hearts.length;
+            const heartsPerBatch = Math.max(1, Math.floor(totalHearts / 50));
+            let isTypingComplete = false;
+            
+            const showNextBatch = () => {
+                let batchCount = 0;
+                while (visibleCount < totalHearts && batchCount < heartsPerBatch) {
+                    hearts[visibleCount].visible = true;
+                    hearts[visibleCount].opacity = 0; // Start with 0 opacity
+                    visibleCount++;
+                    batchCount++;
+                }
+                
+                if (visibleCount < totalHearts) {
+                    setTimeout(showNextBatch, 50);
+                } else {
+                    isTypingComplete = true;
+                }
+            };
+            
+            showNextBatch();
+            animate();
+            
+            return new Promise(resolve => {
+                const checkTypingComplete = setInterval(() => {
+                    if (isTypingComplete) {
+                        clearInterval(checkTypingComplete);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
+        function animate() {
+            heartCtx.clearRect(0, 0, heartCanvas.width, heartCanvas.height);
+            
+            let anyHeartMoving = false;
+            let anyHeartVisible = false;
+            const now = Date.now();
+            
+            // Check if all hearts have reached their positions
+            const allHeartsPlaced = hearts.every(heart => {
+                if (!heart.visible) return false;
+                return Math.abs(heart.x - heart.targetX) <= 0.1 && 
+                       Math.abs(heart.y - heart.targetY) <= 0.1;
+            });
+            
+            // Start blinking effect when all hearts are in place
+            if (allHeartsPlaced && typeof startBlinking === 'undefined') {
+                startBlinking = now;
+            }
+            
+            hearts.forEach(heart => {
+                if (!heart.visible) return;
+                
+                anyHeartVisible = true;
+                
+                // Update position with easing
+                heart.vx += (heart.targetX - heart.x) * 0.1;
+                heart.vy += (heart.targetY - heart.y) * 0.1;
+                
+                // Apply friction
+                heart.vx *= 0.95;
+                heart.vy *= 0.95;
+                
+                // Update position
+                heart.x += heart.vx;
+                heart.y += heart.vy;
+                
+                // Check if this heart is still moving
+                const isMoving = Math.abs(heart.x - heart.targetX) > 0.1 || 
+                                Math.abs(heart.y - heart.targetY) > 0.1;
+                
+                if (isMoving) {
+                    anyHeartMoving = true;
+                }
+                
+                // Calculate opacity for blinking effect
+                let opacity = 1;
+                if (startBlinking) {
+                    // Blinking effect - varies between 0.3 and 1.0 with a smooth sine wave
+                    const blinkSpeed = 1.5; // Speed of blinking (cycles per second)
+                    opacity = 0.3 + 0.7 * (Math.sin(now * 0.001 * blinkSpeed * Math.PI) * 0.5 + 0.5);
+                }
+                
+                // Draw heart with current opacity
+                drawHeart(heart.x, heart.y, heart.color, 1, opacity);
+            });
+            
+            // Continue animation if any heart is moving or if we have more hearts to show
+            if (anyHeartMoving || (anyHeartVisible && hearts.some(h => !h.visible))) {
+                animationId = requestAnimationFrame(animate);
+            } else if (anyHeartVisible) {
+                // Continue animation for blinking effect
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+        
+        function drawHeart(x, y, color, scale = 1, opacity = 1) {
+            heartCtx.save();
+            heartCtx.globalAlpha = opacity;
+            heartCtx.translate(x, y);
+            heartCtx.scale(0.8 * scale, 0.8 * scale);
+            heartCtx.fillStyle = color;
+            heartCtx.beginPath();
+            heartCtx.moveTo(0, 0);
+            heartCtx.bezierCurveTo(5, -5, 10, -10, 0, -15);
+            heartCtx.bezierCurveTo(-10, -10, -5, -5, 0, 0);
+            heartCtx.fill();
+            heartCtx.restore();
+        }
+        
+        function startAnimation() {
+            const text = document.getElementById('textInput').value.trim().toUpperCase();
+            if (text) {
+                startBlinking = undefined; // Reset blinking state
+                renderText(text);
+            }
+        }
+        
+        function getRandomColor() {
+            const colors = ['#ff6b6b', '#ff8e8e', '#ffb3b3', '#ff6b8b', '#ff8eab', '#ff4d6d'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // Allow Enter key to trigger the animation
+        document.getElementById('textInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startAnimation();
+            }
+        });
+    </script>
+</body>
+</html>
